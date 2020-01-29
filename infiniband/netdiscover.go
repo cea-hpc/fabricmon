@@ -12,6 +12,7 @@ import "C"
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 	"unsafe"
 
@@ -24,6 +25,18 @@ type HCA struct {
 	// umad_ca_t contains an array of pointers - associated memory must be freed with
 	// umad_release_ca(umad_ca_t *ca)
 	umad_ca *C.umad_ca_t
+}
+
+func (h *HCA) HCAInfo() map[string]string {
+	var result = make(map[string]string)
+	result["ca"] = C.GoString(&h.umad_ca.ca_name[0])
+	result["type"] = C.GoString(&h.umad_ca.ca_type[0])
+	result["ports"] = strconv.FormatInt(int64(h.umad_ca.numports), 10)
+	result["firmware_version"] = C.GoString(&h.umad_ca.fw_ver[0])
+	result["hardware_version"] = C.GoString(&h.umad_ca.hw_ver[0])
+	result["node_guid"] = fmt.Sprintf("%#016x", ntohll(uint64(h.umad_ca.node_guid)))
+	result["system_guid"] = fmt.Sprintf("%#016x", ntohll(uint64(h.umad_ca.system_guid)))
+	return result
 }
 
 func (h *HCA) NetDiscover(output chan Fabric, resetThreshold uint) {

@@ -11,6 +11,7 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"time"
@@ -27,6 +28,10 @@ import (
 	"github.com/dswarbrick/fabricmon/writer"
 	"github.com/dswarbrick/fabricmon/writer/forcegraph"
 	"github.com/dswarbrick/fabricmon/writer/influxdb"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // router duplicates a Fabric struct received via channel and outputs it to multiple receiver
@@ -81,6 +86,24 @@ func main() {
 		os.Exit(1)
 	}
 
+	hcas_info_metric := promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hca_info",
+		Help: "Informations about discovered HCAs",
+	},
+		[]string{"ca", "type", "ports", "firmware_version", "hardware_version", "node_guid", "system_guid"})
+
+	for _, hca := range hcas {
+		info := hca.HCAInfo()
+		hcas_info_metric.WithLabelValues(
+			info["ca"],
+			info["type"],
+			info["ports"],
+			info["firmware_version"],
+			info["hardware_version"],
+			info["node_guid"],
+			info["system-guid"],
+		).Set(1)
+	}
 	log.SetLevel(log.Level(conf.Logging.LogLevel))
 	log.Info("FabricMon ", version.Info())
 
@@ -101,6 +124,15 @@ func main() {
 
 	if conf.Topology.Enabled {
 		writers = append(writers, &forcegraph.ForceGraphWriter{OutputDir: conf.Topology.OutputDir})
+	}
+
+	if conf.PrometheusExporter.Enabled {
+		promauto.NewGauge(prometheus.GaugeOpts{
+			Name: "up",
+			Help: "Is the last discovery succesfull ?",
+		}).Set(42)
+		http.Handle("/metrics", promhttp.Handler())
+		go http.ListenAndServe(conf.PrometheusExporter.ListenAddr, nil)
 	}
 
 	// First sweep.
