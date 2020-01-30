@@ -22,7 +22,7 @@ type FabricmonConf struct {
 	InfluxDB       []InfluxDBConf
 	Logging        LoggingConf
 	Topology       TopologyConf
-	PrometheusExporter ExporterConf `yaml:"prometheus_exporter"`
+	PrometheusExporter PrometheusExporterConf `yaml:"prometheus_exporter"`
 }
 
 func (conf *FabricmonConf) validate() error {
@@ -52,7 +52,7 @@ type TopologyConf struct {
 	OutputDir string `yaml:"output_dir"`
 }
 
-type ExporterConf struct {
+type PrometheusExporterConf struct {
 	Enabled    bool
 	ListenAddr string `yaml:"listenaddr"`
 }
