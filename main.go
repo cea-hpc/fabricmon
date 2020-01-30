@@ -25,6 +25,7 @@ import (
 	"github.com/dswarbrick/fabricmon/writer"
 	"github.com/dswarbrick/fabricmon/writer/forcegraph"
 	"github.com/dswarbrick/fabricmon/writer/influxdb"
+	"github.com/dswarbrick/fabricmon/writer/prometheus_exporter"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -88,7 +89,7 @@ func main() {
 	}
 
 	hcas_info_metric := promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "hca_info",
+		Name: "fabricmon_hca_info",
 		Help: "Informations about discovered HCAs",
 	},
 		[]string{"ca", "type", "ports", "firmware_version", "hardware_version", "node_guid", "system_guid"})
@@ -128,10 +129,8 @@ func main() {
 	}
 
 	if conf.PrometheusExporter.Enabled {
-		promauto.NewGauge(prometheus.GaugeOpts{
-			Name: "up",
-			Help: "Is the last discovery succesfull ?",
-		}).Set(42)
+		w := prometheus_exporter.NewPrometheusWriter(conf.PrometheusExporter)
+		writers = append(writers, w)
 		http.Handle("/metrics", promhttp.Handler())
 		go http.ListenAndServe(conf.PrometheusExporter.ListenAddr, nil)
 	}
@@ -142,6 +141,11 @@ func main() {
 	}
 
 	if *daemonize {
+		for _, c := range conf.InfluxDB {
+			w := influxdb.NewInfluxDBWriter(c)
+			writers = append(writers, w)
+		}
+
 		for _, c := range conf.InfluxDB {
 			w := influxdb.NewInfluxDBWriter(c)
 			writers = append(writers, w)
