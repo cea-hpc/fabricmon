@@ -58,7 +58,7 @@ func smInfo(caName string, portNum int) {
 
 	C.umad_get_port(ibd_ca, ibd_ca_port, &port)
 	portid.lid = C.int(port.sm_lid)
-	portid.sl = C.uchar(port.sm_sl)
+	portid.sl = C.uint8_t(port.sm_sl)
 	C.umad_release_port(&port)
 
 	C.mad_encode_field(&sminfo[0], C.IB_SMINFO_PRIO_F, unsafe.Pointer(&prio))
