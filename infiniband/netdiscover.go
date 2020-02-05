@@ -189,7 +189,7 @@ func (n *ibndNode) getPortCounters(portId *C.ib_portid_t, portNum int, ibmadPort
 				portLog.WithFields(log.Fields{
 					"counter": counter.Name,
 					"value":   counters[field],
-				}).Warn("Counter exceeds threshold")
+				}).Debug("Counter exceeds threshold")
 
 				selMask |= counter.Select
 			}
@@ -199,7 +199,7 @@ func (n *ibndNode) getPortCounters(portId *C.ib_portid_t, portNum int, ibmadPort
 			var pc [1024]byte
 
 			resetLog := portLog.WithFields(log.Fields{"select_mask": fmt.Sprintf("%#x", selMask)})
-			resetLog.Warn("Resetting counters")
+			resetLog.Debug("Resetting counters")
 
 			if C.performance_reset_via(unsafe.Pointer(&pc), portId, C.int(portNum), C.uint(selMask), PMA_TIMEOUT, C.IB_GSI_PORT_COUNTERS, ibmadPort) == nil {
 				resetLog.Error("performance_reset_via failed")
@@ -348,7 +348,7 @@ func (n *ibndNode) walkPorts(mad_port *C.struct_ibmad_port, resetThreshold uint)
 					uint(C.mad_get_field(unsafe.Pointer(&rp.info), 0, C.IB_PORT_LINK_WIDTH_SUPPORTED_F)))
 
 				if uint(linkWidth) != maxWidth {
-					portLog.Warn("Link width is not the max width supported by both ports")
+					portLog.Debug("Link width is not the max width supported by both ports")
 				}
 
 				// Determine max speed supported by both ends
