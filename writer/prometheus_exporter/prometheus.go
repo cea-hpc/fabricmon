@@ -10,8 +10,8 @@ package prometheus_exporter
 import (
 	"strconv"
 	"fmt"
-	
-	log "github.com/sirupsen/logrus"
+
+	log "log/slog"
 
 	"github.com/dswarbrick/fabricmon/config"
 	"github.com/dswarbrick/fabricmon/infiniband"
@@ -52,12 +52,9 @@ func (w *PrometheusWriter) Receiver(input chan infiniband.Fabric) {
 
 	for fabric := range input {
 		err := w.makeBatch(fabric)
-		log.WithFields(log.Fields{
-			"hca":    fabric.CAName,
-			"port":   fabric.SourcePort,
-		}).Debugf("Prometheus exporter metrics update")
+		log.With("hca", fabric.CAName, "port", fabric.SourcePort).Debug("Prometheus exporter metrics update")
 		if err != nil {
-			log.Error(err)
+			log.Error(err.Error())
 		}
 	}
 

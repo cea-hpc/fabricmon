@@ -106,8 +106,6 @@ func main() {
 			info["system-guid"],
 		).Set(1)
 	}
-	log.SetLevel(log.Level(conf.Logging.LogLevel))
-	log.Info("FabricMon ", version.Info())
 
 	// Channel to signal goroutines that we are shutting down.
 	shutdownChan := make(chan bool)
