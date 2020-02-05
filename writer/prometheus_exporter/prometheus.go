@@ -9,8 +9,7 @@ package prometheus_exporter
 
 import (
 	"strconv"
-	"fmt"
-	
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/dswarbrick/fabricmon/config"
@@ -29,20 +28,10 @@ type PrometheusWriter struct {
 func NewPrometheusWriter(config config.PrometheusExporterConf) *PrometheusWriter {
 	hca_port_vec := promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "fabricmon_port_counter",
-		Help: "Informations about discovered HCAs",
+		Help: "Counter values for a given Node/Port",
 	},
-		[]string{"src_host", "src_hca", "src_hca_port", "guid", "node_desc", "node_port", "counter", "device_id", "vendor_id"})
-	hca_port_speed := promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "fabricmon_port_speed",
-		Help: "Informations about discovered HCAs",
-	},
-		[]string{"src_host", "src_hca", "src_hca_port", "guid", "node_desc", "node_port", "device_id", "vendor_id"})
-	hca_port_width := promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "fabricmon_port_width",
-		Help: "Informations about discovered HCAs",
-	},
-		[]string{"src_host", "src_hca", "src_hca_port", "guid", "node_desc", "node_port", "device_id", "vendor_id"})
-	return &PrometheusWriter{config: config, hca_port_vec: hca_port_vec, hca_port_speed: hca_port_speed, hca_port_width: hca_port_width}
+		[]string{"src_hca", "node_desc", "node_port", "counter"})
+	return &PrometheusWriter{config: config, hca_port_vec: hca_port_vec}
 }
 
 // TODO: Rename this to something more descriptive (and which is not so easily confused with method
@@ -76,12 +65,8 @@ func (w *PrometheusWriter) makeBatch(fabric infiniband.Fabric) (error) {
 			continue
 		}
 
-		tags["guid"] = fmt.Sprintf("%016x", node.GUID)
 		tags["node_desc"] = node.NodeDesc
-		tags["device_id"] = fmt.Sprintf("%016x", node.DeviceID)
-		tags["vendor_id"] = fmt.Sprintf("%016x", node.VendorID)
-		
-		
+
 		for portNum, port := range node.Ports {
 			tags["port"] = strconv.Itoa(portNum)
 
@@ -89,10 +74,10 @@ func (w *PrometheusWriter) makeBatch(fabric infiniband.Fabric) (error) {
 				switch value.(type) {
 				case uint32:
 					tags["counter"] = infiniband.StdCounterMap[counter].Name
-					w.hca_port_vec.WithLabelValues(tags["host"], tags["hca"], tags["src_port"], tags["guid"], tags["node_desc"], tags["port"], tags["counter"], tags["device_id"], tags["vendor_id"]).Set(float64(value.(uint32)))
+					w.hca_port_vec.WithLabelValues(tags["hca"]+"/"+tags["src_port"], tags["node_desc"], tags["port"], tags["counter"]).Set(float64(value.(uint32)))
 				case uint64:
 					tags["counter"] = infiniband.ExtCounterMap[counter].Name
-					w.hca_port_vec.WithLabelValues(tags["host"], tags["hca"], tags["src_port"], tags["guid"], tags["node_desc"], tags["port"], tags["counter"], tags["device_id"], tags["vendor_id"]).Set(float64(value.(uint64)))
+					w.hca_port_vec.WithLabelValues(tags["hca"]+"/"+tags["src_port"], tags["node_desc"], tags["port"], tags["counter"]).Set(float64(value.(uint64)))
 				default:
 					continue
 				}
