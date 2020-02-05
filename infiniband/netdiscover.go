@@ -278,7 +278,7 @@ func (n *ibndNode) walkPorts(mad_port *C.struct_ibmad_port, resetThreshold uint)
 
 	for portNum := 0; portNum <= int(n.ibnd_node.numports); portNum++ {
 		var (
-			info         *[C.IB_SMP_DATA_SIZE]C.uchar
+			info         *[C.IB_SMP_DATA_SIZE]C.uint8_t
 			linkSpeedExt uint
 		)
 
