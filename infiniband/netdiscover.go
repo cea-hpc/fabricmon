@@ -335,10 +335,9 @@ func (n *ibndNode) walkPorts(mad_port *C.struct_ibmad_port, resetThreshold uint)
 
 		// Remote port may be nil if port state is polling / armed.
 		rp := pp.remoteport
-
 		if rp != nil {
-			myPort.RemoteGUID = uint64(rp.node.guid)
-			myPort.RemoteNodeDesc = C.GoString(&rp.node.nodedesc[0])
+			rn := ibndNode{ibnd_node: (*C.ibnd_node_t)(unsafe.Pointer(rp.node))}
+			myPort.RemoteNode = rn.simpleNode()
 
 			// Port counters will only be fetched if port is ACTIVE + LINKUP
 			if (portState == C.IB_LINK_ACTIVE) && (physState == C.IB_PORT_PHYS_STATE_LINKUP) {

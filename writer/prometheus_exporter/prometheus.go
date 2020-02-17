@@ -31,7 +31,7 @@ func NewPrometheusWriter(config config.PrometheusExporterConf) *PrometheusWriter
 		Name: "fabricmon_port_counter",
 		Help: "Counter values for a given Node/Port",
 	},
-		[]string{"src_hca", "node_desc", "node_port", "counter"})
+		[]string{"hca", "desc", "port", "remote_desc", "type", "speed", "width", "counter"})
 	return &PrometheusWriter{config: config, hca_port_vec: hca_port_vec}
 }
 
@@ -63,19 +63,24 @@ func (w *PrometheusWriter) makeBatch(fabric infiniband.Fabric) (error) {
 			continue
 		}
 
-		tags["node_desc"] = node.NodeDesc
+		tags["desc"] = node.NodeDesc
+		tags["type"] = strconv.Itoa(node.NodeType)
 
 		for portNum, port := range node.Ports {
 			tags["port"] = strconv.Itoa(portNum)
+			tags["remote_desc"] = port.RemoteNode.NodeDesc
+			tags["remote_type"] = strconv.Itoa(port.RemoteNode.NodeType)
+			tags["speed"] = port.LinkSpeed
+			tags["width"] = port.LinkWidth
 
 			for counter, value := range port.Counters {
 				switch value.(type) {
 				case uint32:
 					tags["counter"] = infiniband.StdCounterMap[counter].Name
-					w.hca_port_vec.WithLabelValues(tags["hca"]+"/"+tags["src_port"], tags["node_desc"], tags["port"], tags["counter"]).Set(float64(value.(uint32)))
+					w.hca_port_vec.WithLabelValues(tags["hca"]+"/"+tags["src_port"], tags["desc"], tags["port"], tags["remote_desc"], tags["remote_type"], tags["speed"], tags["width"], tags["counter"]).Set(float64(value.(uint32)))
 				case uint64:
 					tags["counter"] = infiniband.ExtCounterMap[counter].Name
-					w.hca_port_vec.WithLabelValues(tags["hca"]+"/"+tags["src_port"], tags["node_desc"], tags["port"], tags["counter"]).Set(float64(value.(uint64)))
+					w.hca_port_vec.WithLabelValues(tags["hca"]+"/"+tags["src_port"], tags["desc"], tags["port"], tags["remote_desc"], tags["remote_type"], tags["speed"], tags["width"], tags["counter"]).Set(float64(value.(uint64)))
 				default:
 					continue
 				}
