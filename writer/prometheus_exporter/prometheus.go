@@ -9,7 +9,6 @@ package prometheus_exporter
 
 import (
 	"strconv"
-	"fmt"
 
 	log "log/slog"
 
