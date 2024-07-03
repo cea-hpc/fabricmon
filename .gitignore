@@ -33,3 +33,5 @@ go.mod
 go.sum
 vendor/
 vendor/github.com vendor/golang.org vendor/gopkg.in vendor/modules.txt
+
+dist/
