@@ -16,12 +16,12 @@ import (
 
 // FabricmonConf is the main configuration struct for FabricMon.
 type FabricmonConf struct {
-	PollInterval   time.Duration `yaml:"poll_interval"`
-	ResetThreshold uint          `yaml:"counter_reset_threshold"`
-	Mkey           uint64        `yaml:"m_key"`
-	InfluxDB       []InfluxDBConf
-	Logging        LoggingConf
-	Topology       TopologyConf
+	PollInterval       time.Duration `yaml:"poll_interval"`
+	ResetThreshold     uint          `yaml:"counter_reset_threshold"`
+	Mkey               uint64        `yaml:"m_key"`
+	InfluxDB           []InfluxDBConf
+	Logging            LoggingConf
+	Topology           TopologyConf
 	PrometheusExporter PrometheusExporterConf `yaml:"prometheus_exporter"`
 }
 

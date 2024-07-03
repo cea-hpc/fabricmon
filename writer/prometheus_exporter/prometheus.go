@@ -15,13 +15,13 @@ import (
 
 	"github.com/dswarbrick/fabricmon/config"
 	"github.com/dswarbrick/fabricmon/infiniband"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 type PrometheusWriter struct {
-	config config.PrometheusExporterConf
-	hca_port_vec *prometheus.GaugeVec
+	config         config.PrometheusExporterConf
+	hca_port_vec   *prometheus.GaugeVec
 	hca_port_speed *prometheus.GaugeVec
 	hca_port_width *prometheus.GaugeVec
 }
@@ -51,7 +51,7 @@ func (w *PrometheusWriter) Receiver(input chan infiniband.Fabric) {
 	log.Debug("PrometheusWriter input channel closed.")
 }
 
-func (w *PrometheusWriter) makeBatch(fabric infiniband.Fabric) (error) {
+func (w *PrometheusWriter) makeBatch(fabric infiniband.Fabric) error {
 	tags := map[string]string{
 		"host":     fabric.Hostname,
 		"hca":      fabric.CAName,
