@@ -11,9 +11,11 @@ package main
 import (
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"time"
+	"strings"
 
 	"golang.org/x/sys/unix"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -24,6 +26,11 @@ import (
 	"github.com/dswarbrick/fabricmon/writer"
 	"github.com/dswarbrick/fabricmon/writer/forcegraph"
 	"github.com/dswarbrick/fabricmon/writer/influxdb"
+	"github.com/dswarbrick/fabricmon/writer/prometheus_exporter"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // router duplicates a Fabric struct received via channel and outputs it to multiple receiver
@@ -75,18 +82,37 @@ func main() {
 	}
 
 	slog.Info("FabricMon " + version.Info())
-	hcas := infiniband.GetCAs()
+	hcas := infiniband.GetCAs(strings.Split(conf.Hcas, ","))
 
 	if len(hcas) == 0 {
 		slog.Error("No HCAs found in system. Exiting.")
 		os.Exit(1)
 	}
 
+	hcas_info_metric := promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "fabricmon_hca_info",
+		Help: "Informations about discovered HCAs",
+	},
+		[]string{"ca", "type", "ports", "firmware_version", "hardware_version", "node_guid", "system_guid"})
+
+	for _, hca := range hcas {
+		info := hca.HCAInfo()
+		hcas_info_metric.WithLabelValues(
+			info["ca"],
+			info["type"],
+			info["ports"],
+			info["firmware_version"],
+			info["hardware_version"],
+			info["node_guid"],
+			info["system-guid"],
+		).Set(1)
+	}
+
 	// Channel to signal goroutines that we are shutting down.
 	shutdownChan := make(chan bool)
 
 	// Setup signal handler to catch SIGINT, SIGTERM.
-	sigChan := make(chan os.Signal)
+	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, unix.SIGINT, unix.SIGTERM)
 	go func() {
 		s := <-sigChan
@@ -101,12 +127,24 @@ func main() {
 		writers = append(writers, &forcegraph.ForceGraphWriter{OutputDir: conf.Topology.OutputDir})
 	}
 
+	if conf.PrometheusExporter.Enabled {
+		w := prometheus_exporter.NewPrometheusWriter(conf.PrometheusExporter)
+		writers = append(writers, w)
+		http.Handle("/metrics", promhttp.Handler())
+		go http.ListenAndServe(conf.PrometheusExporter.ListenAddr, nil)
+	}
+
 	// First sweep.
 	for _, hca := range hcas {
 		hca.NetDiscover(nil, conf.Mkey, conf.ResetThreshold)
 	}
 
 	if *daemonize {
+		for _, c := range conf.InfluxDB {
+			w := influxdb.NewInfluxDBWriter(c)
+			writers = append(writers, w)
+		}
+
 		for _, c := range conf.InfluxDB {
 			w := influxdb.NewInfluxDBWriter(c)
 			writers = append(writers, w)

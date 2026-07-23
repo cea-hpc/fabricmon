@@ -14,8 +14,11 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"time"
 	"unsafe"
+
+	"github.com/juliangruber/go-intersect/v2"
 )
 
 type HCA struct {
@@ -24,6 +27,18 @@ type HCA struct {
 	// umad_ca_t contains an array of pointers - associated memory must be freed with
 	// umad_release_ca(umad_ca_t *ca)
 	umad_ca *C.umad_ca_t
+}
+
+func (h *HCA) HCAInfo() map[string]string {
+	var result = make(map[string]string)
+	result["ca"] = C.GoString(&h.umad_ca.ca_name[0])
+	result["type"] = C.GoString(&h.umad_ca.ca_type[0])
+	result["ports"] = strconv.FormatInt(int64(h.umad_ca.numports), 10)
+	result["firmware_version"] = C.GoString(&h.umad_ca.fw_ver[0])
+	result["hardware_version"] = C.GoString(&h.umad_ca.hw_ver[0])
+	result["node_guid"] = fmt.Sprintf("%#016x", ntohll(uint64(h.umad_ca.node_guid)))
+	result["system_guid"] = fmt.Sprintf("%#016x", ntohll(uint64(h.umad_ca.system_guid)))
+	return result
 }
 
 func (h *HCA) NetDiscover(output chan Fabric, mkey uint64, resetThreshold uint) {
@@ -107,11 +122,12 @@ func (h *HCA) Release() {
 	}
 }
 
-func GetCAs() []HCA {
+func GetCAs(targetCAs []string) []HCA {
 	caNames := umadGetCANames()
-	hcas := make([]HCA, len(caNames))
+	finalCAs := intersect.SimpleGeneric(targetCAs, caNames)
+	hcas := make([]HCA, len(finalCAs))
 
-	for i, caName := range caNames {
+	for i, caName := range finalCAs {
 		var ca C.umad_ca_t
 
 		ca_name := C.CString(caName)
@@ -176,7 +192,7 @@ func (n *ibndNode) getPortCounters(portId *C.ib_portid_t, portNum int, ibmadPort
 			counters[field] = uint32(C.mad_get_field(unsafe.Pointer(&buf), 0, field))
 
 			if float64(counters[field].(uint32)) > (float64(counter.Limit) * float64(resetThreshold) / 100) {
-				portLog.Warn("counter exceeds threshold", "counter", counter.Name, "value", counters[field])
+				portLog.With("counter", counter.Name, "value", counters[field]).Debug("Counter exceeds threshold")
 
 				selMask |= counter.Select
 			}
@@ -186,7 +202,7 @@ func (n *ibndNode) getPortCounters(portId *C.ib_portid_t, portNum int, ibmadPort
 			var pc [1024]byte
 
 			resetLog := portLog.With("select_mask", fmt.Sprintf("%#x", selMask))
-			resetLog.Warn("resetting counters")
+			resetLog.Debug("Resetting counters")
 
 			if C.performance_reset_via(unsafe.Pointer(&pc), portId, C.int(portNum), C.uint(selMask), PMA_TIMEOUT, C.IB_GSI_PORT_COUNTERS, ibmadPort) == nil {
 				resetLog.Error("performance_reset_via failed")
@@ -262,7 +278,7 @@ func (n *ibndNode) walkPorts(mad_port *C.struct_ibmad_port, resetThreshold uint)
 
 	for portNum := 0; portNum <= int(n.ibnd_node.numports); portNum++ {
 		var (
-			info         *[C.IB_SMP_DATA_SIZE]C.uchar
+			info         *[C.IB_SMP_DATA_SIZE]C.uint8_t
 			linkSpeedExt uint
 		)
 
@@ -322,10 +338,9 @@ func (n *ibndNode) walkPorts(mad_port *C.struct_ibmad_port, resetThreshold uint)
 
 		// Remote port may be nil if port state is polling / armed.
 		rp := pp.remoteport
-
 		if rp != nil {
-			myPort.RemoteGUID = uint64(rp.node.guid)
-			myPort.RemoteNodeDesc = C.GoString(&rp.node.nodedesc[0])
+			rn := ibndNode{ibnd_node: (*C.ibnd_node_t)(unsafe.Pointer(rp.node))}
+			myPort.RemoteNode = rn.simpleNode()
 
 			// Port counters will only be fetched if port is ACTIVE + LINKUP
 			if (portState == C.IB_LINK_ACTIVE) && (physState == C.IB_PORT_PHYS_STATE_LINKUP) {
@@ -335,7 +350,7 @@ func (n *ibndNode) walkPorts(mad_port *C.struct_ibmad_port, resetThreshold uint)
 					uint(C.mad_get_field(unsafe.Pointer(&rp.info), 0, C.IB_PORT_LINK_WIDTH_SUPPORTED_F)))
 
 				if uint(linkWidth) != maxWidth {
-					portLog.Warn("link width is not the max width supported by both ports")
+					portLog.Debug("Link width is not the max width supported by both ports")
 				}
 
 				// Determine max speed supported by both ends

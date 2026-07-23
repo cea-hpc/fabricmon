@@ -25,3 +25,12 @@ influxdb:
 #  password: fabricmon
 #  retention_policy: autogen
 #  timeout: 10s
+
+prometheus_exporter:
+  enabled: true
+  listenaddr: ":9199"
+
+# HCAs name to listen to.
+# Names must be comma-separated.
+# hcas: "mlx5_0,mlx5_1,..."
+hcas: "mlx5_0"
